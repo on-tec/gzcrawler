@@ -1,22 +1,22 @@
 {
-    "name": "on-tec/gzcrawler",
-    "description": "allows to load and parse data from ftp.zakupki.gov.ru",
-    "authors": [
-        {
-            "name": "Sergey Mikhalenko",
-            "email": "michael.enco@gmail.com"
-        }
-    ],
-    "require": {},
-    "require-dev": {
-        "phpunit/phpunit": "^6.0"
-    },
-    "autoload": {
-      "psr-4": {
-        "GZCrawler\\": "src/"
-      }
-    },
-    "scripts": {
-      "test": "php test.php"
+  "name": "on-tec/gzcrawler",
+  "description": "allows to load and parse data from ftp.zakupki.gov.ru",
+  "authors": [
+    {
+      "name": "Sergey Mikhalenko",
+      "email": "michael.enco@gmail.com"
     }
+  ],
+  "require": {},
+  "require-dev": {
+    "phpunit/phpunit": "^6.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "GZCrawler\\": "src/"
+    }
+  },
+  "scripts": {
+    "test": "php test.php"
+  }
 }

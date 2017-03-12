@@ -1,9 +1,15 @@
 <?php
 
 return [
-  //'purchaseNoticeOA',
-  //'purchaseNoticeAE',
-  //'purchaseNoticeZK',
+  'purchaseNoticeOA' => [
+    'guid' => 'ns2:guid'
+  ],
+  'purchaseNoticeAE' => [
+    'guid' => 'ns2:guid'
+  ],
+  'purchaseNoticeZK' => [
+    'guid' => 'ns2:guid'
+  ],
   'purchaseNoticeOK' => [
     'created_at' => [
       'type' => 'date',
