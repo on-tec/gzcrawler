@@ -158,8 +158,14 @@ class Crawler {
   public function parseXml($xml_file, $type) {
     $template = $this->typeDict[$type];
 
+    $xml_content = file_get_contents($xml_file);
+
+    if(!$xml_content) {
+      return null;
+    }
+
     //avoid default namespace redifining
-    $root = new \SimpleXMLElement(str_replace('xmlns=', 'ns=', file_get_contents($xml_file)));
+    $root = new \SimpleXMLElement(str_replace('xmlns=', 'ns=', $xml_content));
     
     $namespaces = $root->getDocNamespaces();
 
@@ -262,13 +268,13 @@ class Crawler {
       $xml_files = $this->extractZip($zip);
       foreach($xml_files as $xml_file) {
         $filename = basename(parse_url($xml_file, PHP_URL_PATH));
-        $item = $this->parseXml($xml_file, $this->extractTypeFromFileName($filename));
+	$item = $this->parseXml($xml_file, $this->extractTypeFromFileName($filename));
         unlink($xml_file);
-        if($this->newItem)
+        if($item && $this->newItem)
           ($this->newItem)($item);
       }
       if($this->zipDone)
-        ($this->zipDone)(basename($zip));
+        ($this->zipDone)($url);
     }
   }
 }
