@@ -275,7 +275,7 @@ class Crawler {
 	  call_user_func($this->newItem, $item);
       }
       if($this->zipDone) 
-	call_user_func($this->zipDone, $url)
+	call_user_func($this->zipDone, $url);
     }
   }
 }
