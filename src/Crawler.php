@@ -125,7 +125,6 @@ class Crawler {
 
   public function downloadFile($file) {
     $filename = basename(parse_url($file, PHP_URL_PATH));
-    echo "downloading $filename".PHP_EOL;
     $file_path = $this->tmpDir."/$filename";
     $fp = fopen($file_path, "w");
     $ch = curl_init($file);
@@ -206,7 +205,9 @@ class Crawler {
       }
       return $item;
     };
-    return $parseNode($root, $template);
+    $item = $parseNode($root, $template);
+    $item ['type'] = $type;
+    return $item;
   }
 
   public function start() {
