@@ -271,11 +271,11 @@ class Crawler {
         $filename = basename(parse_url($xml_file, PHP_URL_PATH));
 	$item = $this->parseXml($xml_file, $this->extractTypeFromFileName($filename));
         unlink($xml_file);
-        if($item && $this->newItem)
-          ($this->newItem)($item);
+	if($item && $this->newItem)
+	  call_user_func($this->newItem, $item);
       }
-      if($this->zipDone)
-        ($this->zipDone)($url);
+      if($this->zipDone) 
+	call_user_func($this->zipDone, $url)
     }
   }
 }
