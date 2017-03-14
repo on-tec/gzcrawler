@@ -66,6 +66,7 @@ class Crawler {
   }
   
   public function lsDir($url) {
+    echo 'fetch files in '.$url.PHP_EOL;
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_FTPLISTONLY, true);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -124,6 +125,7 @@ class Crawler {
 
 
   public function downloadFile($file) {
+    echo 'downloading file: '.$file.PHP_EOL;
     $filename = basename(parse_url($file, PHP_URL_PATH));
     $file_path = $this->tmpDir."/$filename";
     $fp = fopen($file_path, "w");
@@ -136,6 +138,7 @@ class Crawler {
   }
 
   public function extractZip($file) {
+    echo 'extracting zip: '.$file.PHP_EOL;
     $xml_files = [];
     $zip = new \ZipArchive;
     $res = $zip->open($file);
