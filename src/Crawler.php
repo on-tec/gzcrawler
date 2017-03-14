@@ -214,6 +214,7 @@ class Crawler {
   }
 
   public function start() {
+    echo 'crawler started'.PHP_EOL;
     $types = $this->fileFilter['types']
       ? $this->fileFilter['types']
       : array_keys($this->typeDict);
@@ -264,7 +265,7 @@ class Crawler {
     );
 
     if($this->fileFilter['customFilter']) {
-      $urls = $this->fileFilter['customFilter']($urls);
+      $urls = call_user_func($this->fileFilter['customFilter'],$urls);
     }
 
     foreach($urls as $url) {
