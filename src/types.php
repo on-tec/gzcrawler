@@ -38,7 +38,8 @@ $base = [
     'element' => [
       'info' => 'additionalInfo',
       'okpd2' => 'okpd2/code',
-      'okpd2_description' => 'okpd2/name'
+      'okpd2_description' => 'okpd2/name',
+      'ord' => 'ordinalNumber'
     ]
   ]
 ];
