@@ -276,7 +276,7 @@ class Crawler {
 	$item = $this->parseXml($xml_file, $this->extractTypeFromFileName($filename));
         unlink($xml_file);
 	if($item && $this->newItem)
-	  call_user_func($this->newItem, $item);
+	  call_user_func($this->newItem, $item, $url);
       }
       if($this->zipDone) 
 	call_user_func($this->zipDone, $url);
