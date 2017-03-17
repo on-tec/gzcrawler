@@ -44,6 +44,7 @@ $base = [
   ]
 ];
 return [
+  'purchaseNotice' => $base,
   'purchaseNoticeOA' => $base,
   'purchaseNoticeAE' => $base,
   'purchaseNoticeZK' => $base,
