@@ -21,7 +21,7 @@ $base = [
   'contact_middlename' => 'ns2:contact/middleName',
   'submission_close_date' => [
     'type' => 'date',
-    'xpath' => 'ns2:createDateTime',
+    'xpath' => 'ns2:submissionCloseDateTime',
   ],
   'attachments' => [
     'type' => 'array',
