@@ -209,7 +209,6 @@ class Crawler {
       return $item;
     };
     $item = $parseNode($root, $template);
-    $item ['type'] = $type;
     return $item;
   }
 

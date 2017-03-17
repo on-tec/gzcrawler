@@ -23,6 +23,7 @@ $base = [
     'type' => 'date',
     'xpath' => 'ns2:submissionCloseDateTime',
   ],
+  'type' => 'ns2:purchaseMethodCode',
   'attachments' => [
     'type' => 'array',
     'xpath' => 'ns2:attachments/document',
@@ -48,9 +49,7 @@ return [
   'purchaseNoticeOA' => $base,
   'purchaseNoticeAE' => $base,
   'purchaseNoticeZK' => $base,
-  'purchaseNoticeOK' => $base,
-  'purchaseProtocolRZOA' => $base,
-  'purchaseProtocolPAOA' => $base
+  'purchaseNoticeOK' => $base
 ];
 
 
