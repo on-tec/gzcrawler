@@ -80,14 +80,14 @@ class Crawler {
   }
 
   public function extractTypeFromFileName($filename) {
-    if(!preg_match('/^([a-zA-Z]+).+_\d{8}_\d{6}_\d{8}_\d{6}_daily_\d{3}.xml\z/', $filename, $matches)) {
+    if(!preg_match('/^([a-zA-Z]+).+_\d{8}_\d{6}_\d{8}_\d{6}_daily_\d{3,4}.xml\z/', $filename, $matches)) {
       throw new \Exception("cannot extract type from filename: $filename");
     }
     return $matches[1];
   }
 
   public function extractDateFromFileName($filename) {
-    if(!preg_match('/(\d{8})_\d{6}_\d{8}_\d{6}_daily_\d{3}.xml.zip\z/', $filename, $matches)) {
+    if(!preg_match('/(\d{8})_\d{6}_\d{8}_\d{6}_daily_\d{3,4}.xml.zip\z/', $filename, $matches)) {
       throw new \Exception("cannot extract date from filename: $filename");
     }
     return \DateTime::createFromFormat(
