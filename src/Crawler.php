@@ -2,69 +2,178 @@
 namespace GZCrawler;
 
 class Crawler {
+
+  const TYPE_223_REGIONAL_DAILY = 1;
+  const TYPE_223_NSI = 2;
+
   protected $baseUrl;
   protected $tmpDir;
 
-  protected $fileFilter = [];
+  public $zipDone;
+  protected $xmlDone;
+  protected $newItem;
 
   protected $typeDict;
   protected $regionDict;
 
-  protected $zipDone;
-  protected $newItem;
+  //TYPE_223_REGIONAL_DAILY options
+  protected $dateFrom;
+  protected $dateTo;
+  protected $regions;
+  protected $preDownload;
 
   /** 
    *  @param mixed[] $options {
-   *    @type string "tmpDir" directory to seve downloaded files, 'tmp' by default
-   *    @type string "baseUrl" default is: ftp://fz223free:fz223free@ftp.zakupki.gov.ru/out/published
-   *    @type callable "zipDone" function will be called when whole zip file parsing done. File name 
-   *      will be passed as argument
-   *    @type callable "newItem" function will be called after each parsed item.
-   *    @type mixed[] "fileFilter" {
-   *      @type string[] "types" array of precedure types. You can view list of 
-   *        possible names at ./types.php or define custom type with 'customProcTypes' 
-   *        option. By default, all types will be loaded.
-   *      @type string[] "regions" array of regions name to load data from. If not 
-   *        set, data for all regions will be loaded. Check ./regions.php for possible 
-   *        values.
-   *      @type Date "dateFrom"
-   *      @type Date "dateTo"
-   *      @type callable "customFilter" function that retrives array of .zip file urls
-   *        as argument. Returned array of urls will be downloaded.
-   *    }
+   *    @type string "tmpDir"
+   *	@type integer "type" TYPE_223_REGIONAL_DAILY or TYPE_223_NSI
+   *
+   *    @type callable "zipDone" function will be 
+   *	  called when whole zip file parsing done.
+   *	  Zip url will be passed as argument
+   *	@type callable "xmlDone" function will be 
+   *	  called when xml file parsing done.
+   *	  File name will be passed as argument.
+   *    @type callable "newItem" function will be 
+   *	  called after each parsed item.
+   *
+   *    @type string[] "regions" array of regions name to load data from.
+   *	  If not set, data for all regions will be loaded.
+   *	  Check ./regions.php for possible values.
+   *    @type Date "dateFrom"
+   *    @type Date "dateTo"
+   *    @type callable "preDownload" function that retrives array of
+   *	  .zip file urls as argument. Returned array
+   *	  of urls will be downloaded.
+   *
    *  }
    */
   function __construct($options=[]) {
     $this->typeDict = require(__DIR__.'/types.php');
     $this->regionDict = require(__DIR__.'/regions.php');
     
-    $this->tmpDir = array_key_exists('tmpDir', $options)
+    $this->baseUrl = 'ftp://fz223free:fz223free@ftp.zakupki.gov.ru/out';
+
+    $this->tmpDir = isset($options['tmpDir'])
       ? $options['tmpDir']
       : sys_get_temp_dir();
-    $this->baseUrl = array_key_exists('baseUrl', $options)
-      ? $options['baseUrl']
-      : 'ftp://fz223free:fz223free@ftp.zakupki.gov.ru/out/published';
+    $this->type = isset($options['type'])
+      ? $options['type']
+      : Crawler::TYPE_223_REGIONAL_DAILY;
 
-    if(array_key_exists('zipDone', $options))
-      $this->zipDone = $options['zipDone'];
-    if(array_key_exists('newItem', $options))
-      $this->newItem = $options['newItem'];
+    $this->zipDone = isset($options['zipDone'])
+      ? $options['zipDone']
+      : null;
+    $this->xmlDone = isset($options['xmlDone'])
+      ? $options['xmlDone']
+      : null;
+    $this->newItem = isset($options['newItem'])
+      ? $options['newItem']
+      : null;
 
-    $this->fileFilter = [
-      'dateFrom' => null,
-      'dateTo' => null,
-      'types' => null,
-      'regions' => null,
-      'customFilter' => null
-    ];
-    if (array_key_exists('fileFilter', $options))
-      $this->fileFilter = array_merge($this->fileFilter, $options['fileFilter']);
+    $this->regions = isset($options['regions'])
+      ? $options['regions']
+      : $this->regionDict;
+    $this->dateTo = isset($options['dateTo'])
+      ? $options['dateTo']
+      : null;
+    $this->dateFrom = isset($options['dateFrom'])
+      ? $options['dateFrom']
+      : null;
+    $this->preDownload = isset($options['preDownload'])
+      ? $options['preDownload']
+      : null;
   }
 
-  public function generateDirUrl($type, $region) {
-    return "{$this->baseUrl}/$region/$type/daily/";
+  public function crawl($doc, $data_map) {
+    $urls = $this->generate_file_list($doc);
+    foreach($urls as $url) {
+      $zip = $this->downloadFile($url);
+      $xml_files = $this->extractZip($zip);
+
+      foreach($xml_files as $xml_file) {
+	$items = $this->parseXml($xml_file, $data_map, $doc);
+        unlink($xml_file);
+	if($this->xmlDone) 
+	  call_user_func($this->xmlDone, $xml_file);
+	if($items && $this->newItem) {
+	  foreach($items as $item)
+	    call_user_func($this->newItem, $item, $url);
+	}
+      }
+      if($this->zipDone) 
+	call_user_func($this->zipDone, $url);
+    }
   }
-  
+  public function generate_file_list($doc) {
+    $res = [];
+    switch($this->type) {
+    case Crawler::TYPE_223_REGIONAL_DAILY:
+      $res = $this->regional_daily_files($doc);
+      break;
+    case Crawler::TYPE_223_NSI:
+      $res = [$this->latest_nsi_zip($doc)];
+      break;
+    }
+    if($this->preDownload) {
+      $res = call_user_func($this->preDownload, $res);
+    }
+    return $res;
+  }
+  public function generate_nsi_dir_url($doc) {
+    return "{$this->baseUrl}/nsi/$doc/";
+  }
+  public function latest_nsi_zip($doc) {
+    $dir = $this->generate_nsi_dir_url($doc);
+    $files = $this->lsDir($dir);
+    sort($files);
+    return $dir.'/'.end($files);
+  }
+  public function generate_regional_dir_url($doc, $region) {
+    return "{$this->baseUrl}/published/$region/$doc/daily/";
+  }
+  public function extractDateFromFileName($filename) {
+    if(!preg_match('/(\d{8})_\d{6}_\d{8}_\d{6}_daily_\d{3,4}.xml.zip\z/', $filename, $matches)) {
+      throw new \Exception("cannot extract date from filename: $filename");
+    }
+    return \DateTime::createFromFormat(
+      'Ymd H:i:s',
+      "{$matches[1]} 00:00:00"
+    );
+  }
+  public function regional_daily_files($doc) {
+    $dirs = array_map(
+      function($region) use ($doc) {
+	return $this->generate_regional_dir_url($doc, $region);
+      },
+      $this->regions
+    );
+
+    $urls = array_reduce(
+      $dirs,
+      function($carry, $dir) {
+	return array_merge(
+	  $carry,
+	  array_map(
+	    function($filename) use ($dir) {
+	      return "$dir/$filename";
+	    },
+	    $this->lsDir($dir)
+	  )
+	);
+      },
+      []
+    );
+    $urls = array_filter(
+      $urls,
+      function($file) {
+	$date = $this->extractDateFromFileName($file);
+	return 
+	  !($this->dateFrom && $date < $this->dateFrom)
+	  && !($this->dateTo && $date > $this->dateTo);
+      }
+    );
+    return $urls;
+  }
   public function lsDir($url) {
     echo 'fetch files in '.$url.PHP_EOL;
     $ch = curl_init($url);
@@ -78,52 +187,6 @@ class Crawler {
     //curl response contains eol at the end, which becomes empty string after explode
     return array_slice(explode(PHP_EOL, $res), 0, -1);
   }
-
-  public function extractTypeFromFileName($filename) {
-    if(!preg_match('/^([a-zA-Z]+).+_\d{8}_\d{6}_\d{8}_\d{6}_daily_\d{3,4}.xml\z/', $filename, $matches)) {
-      throw new \Exception("cannot extract type from filename: $filename");
-    }
-    return $matches[1];
-  }
-
-  public function extractDateFromFileName($filename) {
-    if(!preg_match('/(\d{8})_\d{6}_\d{8}_\d{6}_daily_\d{3,4}.xml.zip\z/', $filename, $matches)) {
-      throw new \Exception("cannot extract date from filename: $filename");
-    }
-    return \DateTime::createFromFormat(
-      'Ymd H:i:s',
-      "{$matches[1]} 00:00:00"
-    );
-  }
-
-  public function generateFilesList() {
-    $dirs = $this->generateDirectories();
-    $files = [];
-    foreach($dirs as $dir) {
-      $dir_files = $this->lsDir($dir);
-      foreach($dir_files as $file) {
-        if($this->filterFileByDate($file))
-          $files[]=$file;
-      }
-    }
-    $result = [];
-    if(array_key_exists('fileFilter', $this->options)) {
-      $func = $this->options['fileFilter'];
-      if(array_key_exists('fileFilterBatch', $this->options)) {
-        $batch_size = $this->options['fileFilterBatch'];
-        if($batch_size>0) {
-          while($batch = array_splice($files, $batch_size)) {
-            $result = array_merge($result, $batch);
-          }
-          return $result;
-        }
-      }
-      return $func($files);
-    }
-    return $files;
-  }
-
-
   public function downloadFile($file) {
     echo 'downloading file: '.$file.PHP_EOL;
     $filename = basename(parse_url($file, PHP_URL_PATH));
@@ -136,7 +199,6 @@ class Crawler {
     fclose($fp);
     return $file_path;
   }
-
   public function extractZip($file) {
     echo 'extracting zip: '.$file.PHP_EOL;
     $xml_files = [];
@@ -156,10 +218,7 @@ class Crawler {
     unlink($file);
     return $xml_files;
   }
-  
-  public function parseXml($xml_file, $type) {
-    $template = $this->typeDict[$type];
-
+  public function parseXml($xml_file, $data_map, $doc) {
     $xml_content = file_get_contents($xml_file);
 
     if(!$xml_content) {
@@ -170,25 +229,26 @@ class Crawler {
     $root = new \SimpleXMLElement(str_replace('xmlns=', 'ns=', $xml_content));
     
     $namespaces = $root->getDocNamespaces();
-
     $registerNS = function ($xml_el) use ($namespaces) {
       foreach($namespaces as $name => $url) {
         $xml_el->registerXPathNamespace($name, $url);
       }
     };
-    $registerNS($root);
-    $arr = $root->xpath("ns2:body/ns2:item/ns2:{$type}Data");
-    $root = reset($arr);
 
-    $parseNode = function($node, $template) use (&$parseNode, $registerNS) {
+    $registerNS($root);
+    
+    $parseNode = function($node, $map) use (&$parseNode, $registerNS) {
       $registerNS($node);
       $item = [];
-      foreach($template as $key => $props) {
+      foreach($map as $key => $props) {
         $data_type = is_string($props) ? 'text' : $props['type'];
         $xpath = is_string($props) ? $props : $props['xpath'];
         $target = $node->xpath($xpath);
 
-        switch($data_type) {
+	switch($data_type) {
+	  case 'integer':
+            $item[$key] = (int) reset($target);
+            break;
           case 'text':
             $item[$key] = (string) reset($target);
             break;
@@ -196,10 +256,10 @@ class Crawler {
             $item[$key] = new \DateTime(reset($target));
             break;
           case 'array':
-            $element_template = $template[$key]['element'];
+            $element_map = $map[$key]['element'];
             $item[$key] = array_map(
-              function($node) use ($parseNode, $element_template) {
-                return $parseNode($node,$element_template); 
+              function($node) use ($parseNode, $element_map) {
+                return $parseNode($node,$element_map); 
               },
               $target
             );
@@ -208,77 +268,12 @@ class Crawler {
       }
       return $item;
     };
-    $item = $parseNode($root, $template);
-    return $item;
-  }
-
-  public function start() {
-    echo 'crawler started'.PHP_EOL;
-    $types = $this->fileFilter['types']
-      ? $this->fileFilter['types']
-      : array_keys($this->typeDict);
-    $regions = $this->fileFilter['regions']
-      ? $this->fileFilter['regions']
-      : $this->regionDict;
-
-    $dirs = array_reduce(
-      $types,
-      function($carry, $type) use ($regions) {
-        return array_merge(
-          $carry,
-          array_map(
-            function($region) use ($type) {
-              return $this->generateDirUrl($type, $region);
-            },
-            $regions
-          )
-        );
+    
+    return array_map(
+      function($node) use ($data_map, $parseNode) {
+	return $parseNode($node, $data_map); 
       },
-      []
+      $root->xpath("ns2:body/ns2:item/ns2:{$doc}Data")
     );
-
-    $urls = array_reduce(
-      $dirs,
-      function($carry, $dir) {
-        return array_merge(
-          $carry,
-          array_map(
-            function($filename) use ($dir) {
-              return "$dir/$filename";
-            },
-            $this->lsDir($dir)
-          )
-        );
-      },
-      []
-    );
-
-    $urls = array_filter(
-      $urls,
-      function($file) {
-        $date = $this->extractDateFromFileName($file);
-        return 
-          !($this->fileFilter['dateFrom'] && $date < $this->fileFilter['dateFrom'])
-          && !($this->fileFilter['dateTo'] && $date > $this->fileFilter['dateTo']);
-      }
-    );
-
-    if($this->fileFilter['customFilter']) {
-      $urls = call_user_func($this->fileFilter['customFilter'],$urls);
-    }
-
-    foreach($urls as $url) {
-      $zip = $this->downloadFile($url);
-      $xml_files = $this->extractZip($zip);
-      foreach($xml_files as $xml_file) {
-        $filename = basename(parse_url($xml_file, PHP_URL_PATH));
-	$item = $this->parseXml($xml_file, $this->extractTypeFromFileName($filename));
-        unlink($xml_file);
-	if($item && $this->newItem)
-	  call_user_func($this->newItem, $item, $url);
-      }
-      if($this->zipDone) 
-	call_user_func($this->zipDone, $url);
-    }
   }
 }
