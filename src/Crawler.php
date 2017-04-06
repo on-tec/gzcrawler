@@ -97,7 +97,7 @@ class Crawler {
 	  call_user_func($this->xmlDone, $xml_file);
 	if($items && $this->newItem) {
 	  foreach($items as $item)
-	    call_user_func($this->newItem, $item, $url);
+	    call_user_func($this->newItem, $item, $url, $doc);
 	}
       }
       if($this->zipDone) 
