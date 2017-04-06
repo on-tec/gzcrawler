@@ -168,8 +168,8 @@ class Crawler {
       function($file) {
 	$date = $this->extractDateFromFileName($file);
 	return 
-	  !($this->dateFrom && $date < $this->dateFrom)
-	  && !($this->dateTo && $date > $this->dateTo);
+	  !($this->dateFrom && $date <= $this->dateFrom)
+	  && !($this->dateTo && $date >= $this->dateTo);
       }
     );
     return $urls;
