@@ -5,6 +5,7 @@ class Crawler {
 
   const TYPE_223_REGIONAL_DAILY = 1;
   const TYPE_223_NSI = 2;
+  const TYPE_44_CURR_MONTH = 3;
 
   protected $baseUrl;
   protected $tmpDir;
@@ -22,18 +23,18 @@ class Crawler {
   protected $regions;
   protected $preDownload;
 
-  /** 
+  /**
    *  @param mixed[] $options {
    *    @type string "tmpDir"
    *	@type integer "type" TYPE_223_REGIONAL_DAILY or TYPE_223_NSI
    *
-   *    @type callable "zipDone" function will be 
+   *    @type callable "zipDone" function will be
    *	  called when whole zip file parsing done.
    *	  Zip url will be passed as argument
-   *	@type callable "xmlDone" function will be 
+   *	@type callable "xmlDone" function will be
    *	  called when xml file parsing done.
    *	  File name will be passed as argument.
-   *    @type callable "newItem" function will be 
+   *    @type callable "newItem" function will be
    *	  called after each parsed item.
    *
    *    @type string[] "regions" array of regions name to load data from.
@@ -50,8 +51,10 @@ class Crawler {
   function __construct($options=[]) {
     $this->typeDict = require(__DIR__.'/types.php');
     $this->regionDict = require(__DIR__.'/regions.php');
-    
-    $this->baseUrl = 'ftp://fz223free:fz223free@ftp.zakupki.gov.ru/out';
+
+    $this->baseUrl = isset($options['baseUrl'])
+      ? $options['baseUrl']
+      : 'ftp://fz223free:fz223free@ftp.zakupki.gov.ru/out';
 
     $this->tmpDir = isset($options['tmpDir'])
       ? $options['tmpDir']
@@ -93,14 +96,14 @@ class Crawler {
       foreach($xml_files as $xml_file) {
 	$items = $this->parseXml($xml_file, $data_map, $doc);
         unlink($xml_file);
-	if($this->xmlDone) 
+	if($this->xmlDone)
 	  call_user_func($this->xmlDone, $xml_file);
 	if($items && $this->newItem) {
 	  foreach($items as $item)
 	    call_user_func($this->newItem, $item, $url, $doc);
 	}
       }
-      if($this->zipDone) 
+      if($this->zipDone)
 	call_user_func($this->zipDone, $url);
     }
   }
@@ -167,7 +170,7 @@ class Crawler {
       $urls,
       function($file) {
 	$date = $this->extractDateFromFileName($file);
-	return 
+	return
 	  !($this->dateFrom && $date <= $this->dateFrom)
 	  && !($this->dateTo && $date >= $this->dateTo);
       }
@@ -182,7 +185,7 @@ class Crawler {
     $res = curl_exec($ch);
     curl_close($ch);
     if(!$res) {
-      throw new \Exception("cannot load directory content at $path".PHP_EOL.'curl: '.curl_error($ch));
+      throw new \Exception("cannot load directory content at $url".PHP_EOL.'curl: '.curl_error($ch));
     }
     //curl response contains eol at the end, which becomes empty string after explode
     return array_slice(explode(PHP_EOL, $res), 0, -1);
@@ -212,7 +215,7 @@ class Crawler {
         }
       }
     } else {
-      throw new Exception("cannot open zip: $filepath");
+      throw new Exception("cannot open zip: $file");
     }
     $zip->close();
     unlink($file);
@@ -227,7 +230,7 @@ class Crawler {
 
     //avoid default namespace redifining
     $root = new \SimpleXMLElement(str_replace('xmlns=', 'ns=', $xml_content));
-    
+
     $namespaces = $root->getDocNamespaces();
     $registerNS = function ($xml_el) use ($namespaces) {
       foreach($namespaces as $name => $url) {
@@ -236,7 +239,7 @@ class Crawler {
     };
 
     $registerNS($root);
-    
+
     $parseNode = function($node, $map) use (&$parseNode, $registerNS) {
       $registerNS($node);
       $item = [];
@@ -259,7 +262,7 @@ class Crawler {
             $element_map = $map[$key]['element'];
             $item[$key] = array_map(
               function($node) use ($parseNode, $element_map) {
-                return $parseNode($node,$element_map); 
+                return $parseNode($node,$element_map);
               },
               $target
             );
@@ -268,10 +271,10 @@ class Crawler {
       }
       return $item;
     };
-    
+
     return array_map(
       function($node) use ($data_map, $parseNode) {
-	return $parseNode($node, $data_map); 
+	return $parseNode($node, $data_map);
       },
       $root->xpath("ns2:body/ns2:item/ns2:{$doc}Data")
     );
