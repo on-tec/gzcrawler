@@ -8,7 +8,9 @@ class Crawler
   const TYPE_223_REGIONAL_DAILY = 1;
   const TYPE_223_NSI = 2;
   const TYPE_44_REGIONAL_CURR_MONTH = 3;
+
   public $zipDone;
+
   protected $baseUrl;
   protected $type;
   protected $tmpDir;
@@ -100,15 +102,17 @@ class Crawler
         $fileinfo = pathinfo($xml_file);
         $isXML = $fileinfo['extension'] == 'xml';
 
-        if (strpos($xml_file, 'fcsContractSign') !== false)
-          $isXML = false;
+        if ($this->type == self::TYPE_44_REGIONAL_CURR_MONTH)
+          $isProcessed = preg_match('/('.implode('|', $doc).')/', $xml_file);
+        else
+          $isProcessed = true;
 
-        if ($isXML)
+        if ($isXML && $isProcessed)
           $items = $this->parseXml($xml_file, $data_map, $doc);
 
         unlink($xml_file);
 
-        if (!$isXML)
+        if (!$isXML || !$isProcessed)
           continue;
 
         if ($this->xmlDone)
@@ -227,7 +231,7 @@ class Crawler
   {
     $dirs = array_map(
       function ($region) use ($doc) {
-        return "{$this->baseUrl}/fcs_regions/$region/$doc/currMonth/";
+        return "{$this->baseUrl}/fcs_regions/$region/notifications/currMonth/";
       },
       $this->regions
     );
@@ -317,6 +321,7 @@ class Crawler
     $root = new \SimpleXMLElement(str_replace('xmlns=', 'ns=', $xml_content));
 
     $namespaces = $root->getDocNamespaces();
+
     $registerNS = function ($xml_el) use ($namespaces) {
       foreach ($namespaces as $name => $url) {
         $xml_el->registerXPathNamespace($name, $url);
@@ -331,6 +336,10 @@ class Crawler
       foreach ($map as $key => $props) {
         $data_type = is_string($props) ? 'text' : $props['type'];
         $xpath = is_string($props) ? $props : $props['xpath'];
+
+        if (!$xpath)
+          continue;
+
         $target = $node->xpath($xpath);
 
         switch ($data_type) {
@@ -357,11 +366,9 @@ class Crawler
       return $item;
     };
 
-    echo 'xml file: ' . $xml_file . PHP_EOL;
-
     switch ($this->type) {
       case self::TYPE_44_REGIONAL_CURR_MONTH:
-        $rootData = $root->xpath('ns2:export/*[fn:starts-with(name(), "ns2:fcs")]');
+        $rootData = $root->xpath("//*[starts-with(name(), 'ns2:fcs')]");
         break;
       default:
         $rootData = $root->xpath("ns2:body/ns2:item/ns2:{$doc}Data");
