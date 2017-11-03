@@ -63,9 +63,13 @@ class Crawler
     $this->tmpDir = isset($options['tmpDir'])
       ? $options['tmpDir']
       : sys_get_temp_dir();
+
     $this->type = isset($options['type'])
       ? $options['type']
       : Crawler::TYPE_223_REGIONAL_DAILY;
+
+    if ($this->type == self::TYPE_44_REGIONAL_CURR_MONTH)
+      $this->baseUrl = 'ftp://free:free@ftp.zakupki.gov.ru';
 
     $this->zipDone = isset($options['zipDone'])
       ? $options['zipDone']
@@ -102,17 +106,12 @@ class Crawler
         $fileinfo = pathinfo($xml_file);
         $isXML = $fileinfo['extension'] == 'xml';
 
-        if ($this->type == self::TYPE_44_REGIONAL_CURR_MONTH)
-          $isProcessed = preg_match('/('.implode('|', $doc).')/', $xml_file);
-        else
-          $isProcessed = true;
-
-        if ($isXML && $isProcessed)
+        if ($isXML)
           $items = $this->parseXml($xml_file, $data_map, $doc);
 
         unlink($xml_file);
 
-        if (!$isXML || !$isProcessed)
+        if (!$isXML)
           continue;
 
         if ($this->xmlDone)
@@ -231,7 +230,8 @@ class Crawler
   {
     $dirs = array_map(
       function ($region) use ($doc) {
-        return "{$this->baseUrl}/fcs_regions/$region/notifications/currMonth/";
+        // @todo replace prev to curr
+        return "{$this->baseUrl}/fcs_regions/$region/$doc/prevMonth/";
       },
       $this->regions
     );
@@ -330,7 +330,7 @@ class Crawler
 
     $registerNS($root);
 
-    $parseNode = function ($node, $map) use (&$parseNode, $registerNS) {
+    $parseNode = function ($node, $map, $docType = '') use (&$parseNode, $registerNS) {
       $registerNS($node);
       $item = [];
       foreach ($map as $key => $props) {
@@ -352,6 +352,9 @@ class Crawler
           case 'date':
             $item[$key] = new \DateTime(reset($target));
             break;
+          case 'docType':
+            $item[$key] = $docType;
+            break;
           case 'array':
             $element_map = $map[$key]['element'];
             $item[$key] = array_map(
@@ -369,14 +372,16 @@ class Crawler
     switch ($this->type) {
       case self::TYPE_44_REGIONAL_CURR_MONTH:
         $rootData = $root->xpath("//*[starts-with(name(), 'ns2:fcs')]");
+        $docType = isset($rootData[0]) ? $rootData[0]->getName() : '';
         break;
       default:
         $rootData = $root->xpath("ns2:body/ns2:item/ns2:{$doc}Data");
+        $docType = '';
     }
 
     return array_map(
-      function ($node) use ($data_map, $parseNode) {
-        return $parseNode($node, $data_map);
+      function ($node) use ($data_map, $parseNode, $docType) {
+        return $parseNode($node, $data_map, $docType);
       },
       $rootData
     );
