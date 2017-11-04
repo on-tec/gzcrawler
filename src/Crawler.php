@@ -230,8 +230,7 @@ class Crawler
   {
     $dirs = array_map(
       function ($region) use ($doc) {
-        // @todo replace prev to curr
-        return "{$this->baseUrl}/fcs_regions/$region/$doc/prevMonth/";
+        return "{$this->baseUrl}/fcs_regions/$region/$doc/currMonth/";
       },
       $this->regions
     );
@@ -371,7 +370,7 @@ class Crawler
 
     switch ($this->type) {
       case self::TYPE_44_REGIONAL_CURR_MONTH:
-        $rootData = $root->xpath("//*[starts-with(name(), 'ns2:fcs')]");
+        $rootData = $root->xpath("//*[starts-with(name(), 'ns2:fcs')]|//fcsContractSign");
         $docType = isset($rootData[0]) ? $rootData[0]->getName() : '';
         break;
       default:
