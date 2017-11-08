@@ -349,7 +349,8 @@ class Crawler
             $item[$key] = (string)reset($target);
             break;
           case 'date':
-            $item[$key] = new \DateTime(reset($target));
+            $tmpDate = reset($target);
+            $item[$key] = empty($tmpDate) ? null : new \DateTime($tmpDate);
             break;
           case 'docType':
             $item[$key] = $docType;
