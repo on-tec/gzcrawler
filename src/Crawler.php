@@ -8,6 +8,7 @@ class Crawler
   const TYPE_223_REGIONAL_DAILY = 1;
   const TYPE_223_NSI = 2;
   const TYPE_44_REGIONAL_CURR_MONTH = 3;
+  const TYPE_44_NSI = 4;
 
   public $zipDone;
 
@@ -68,7 +69,7 @@ class Crawler
       ? $options['type']
       : Crawler::TYPE_223_REGIONAL_DAILY;
 
-    if ($this->type == self::TYPE_44_REGIONAL_CURR_MONTH)
+    if (in_array($this->type, [self::TYPE_44_REGIONAL_CURR_MONTH, self::TYPE_44_NSI]))
       $this->baseUrl = 'ftp://free:free@ftp.zakupki.gov.ru';
 
     $this->zipDone = isset($options['zipDone'])
@@ -138,6 +139,9 @@ class Crawler
         break;
       case Crawler::TYPE_44_REGIONAL_CURR_MONTH:
         $res = $this->regional_curr_month_files($doc);
+        break;
+      case Crawler::TYPE_44_NSI:
+        $res = $this->nsi_44_zip($doc);
         break;
     }
     if ($this->preDownload) {
@@ -273,6 +277,37 @@ class Crawler
     );
   }
 
+  public function nsi_44_zip($doc)
+  {
+    $dirs = ["{$this->baseUrl}/fcs_nsi/$doc/"];
+
+    $urls = array_reduce(
+      $dirs,
+      function ($carry, $dir) {
+        return array_merge(
+          $carry,
+          array_map(
+            function ($filename) use ($dir) {
+              return "$dir/$filename";
+            },
+            $this->lsDir($dir)
+          )
+        );
+      },
+      []
+    );
+    $urls = array_filter(
+      $urls,
+      function ($file) {
+        $date = $this->extractDateFromFileNameFZ44($file);
+        return
+          !($this->dateFrom && $date <= $this->dateFrom)
+          && !($this->dateTo && $date >= $this->dateTo);
+      }
+    );
+    return $urls;
+  }
+
   public function downloadFile($file)
   {
     echo 'downloading file: ' . $file . PHP_EOL;
@@ -373,6 +408,10 @@ class Crawler
       case self::TYPE_44_REGIONAL_CURR_MONTH:
         $rootData = $root->xpath("//*[starts-with(name(), 'ns2:fcs')]|//fcsContractSign");
         $docType = isset($rootData[0]) ? $rootData[0]->getName() : '';
+        break;
+      case self::TYPE_44_NSI:
+        $rootData = $root->xpath("//nsiOrganizationList");
+        $docType = '';
         break;
       default:
         $rootData = $root->xpath("ns2:body/ns2:item/ns2:{$doc}Data");
