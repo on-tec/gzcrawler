@@ -234,10 +234,18 @@ class Crawler
   {
     $dirs = array_map(
       function ($region) use ($doc) {
-        return "{$this->baseUrl}/fcs_regions/$region/$doc/currMonth/";
+        return [
+          "{$this->baseUrl}/fcs_regions/$region/$doc/",
+          "{$this->baseUrl}/fcs_regions/$region/$doc/prevMonth/",
+          "{$this->baseUrl}/fcs_regions/$region/$doc/currMonth/",
+        ];
       },
       $this->regions
     );
+
+    $flattenDirs = [];
+    array_walk_recursive($dirs, function($a) use (&$flattenDirs) { $flattenDirs[] = $a; });
+    $dirs = $flattenDirs;
 
     $urls = array_reduce(
       $dirs,
@@ -254,15 +262,19 @@ class Crawler
       },
       []
     );
+
     $urls = array_filter(
       $urls,
       function ($file) {
+        if (preg_match('/(prevMonth|currMonth)$/', $file))
+          return false;
         $date = $this->extractDateFromFileNameFZ44($file);
         return
-          !($this->dateFrom && $date <= $this->dateFrom)
-          && !($this->dateTo && $date >= $this->dateTo);
+          !($this->dateFrom && $date < $this->dateFrom) &&
+          !($this->dateTo && $date > $this->dateTo);
       }
     );
+
     return $urls;
   }
 
@@ -271,10 +283,11 @@ class Crawler
     if (!preg_match('/(\d{8})\d{2}_\S+?.xml.zip\z/', $filename, $matches)) {
       throw new \Exception("cannot extract date from filename: $filename");
     }
-    return \DateTime::createFromFormat(
+    $date = \DateTime::createFromFormat(
       'Ymd H:i:s',
       "{$matches[1]} 00:00:00"
     );
+    return $date;
   }
 
   public function nsi_44_zip($doc)
